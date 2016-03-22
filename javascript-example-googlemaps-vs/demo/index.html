@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Flynet Viewer FVTerm - JavaScript API Example</title>
+		<!-- The FLynet FVTerm JavaScript API -->
+		<script type="text/javascript" src="/FVTerm/scripts/FVTermParent.js"></script>
+	</head>
+	<!-- When loading, call the function to connect the FVTerm session -->
+	<body lang="en" onload="javascript:startFVTerm();">
+		
+		<script type="text/javascript">
+		
+			// Global for Flynet Viewer Terminal API object
+			var fvt = null;
+			
+			// Create connection options for COnnectFVTerm factory function
+			var connectOptions = {};
+			connectOptions.autoStart = true;
+			connectOptions.hostName = 'Insure';
+			connectOptions.application = 'InsureRecog'
+			
+			function startFVTerm() {
+				// Connection factory function
+				// iframe ID, FVTerm URL, connection options, connected function
+				ConnectFVTerm('FVTerm', '/FVTerm/SCTerm.html', connectOptions, onConnected);
+			}
+			
+			// Connected function
+			function onConnected() {
+				// Set the global Terminal API object to fvTermSession
+				fvt = fvTermSession;
+				
+				// Wire up the onnewscreen event
+				fvt.onnewscreen = onNewScreenCustom;
+				
+				// Wire up the onsend event
+				fvt.onsend = onSendScreenCustom;
+			}
+
+		</script>
+		
+		<h1>FVTerm JavaScript API Example</h1>
+		
+        <p id="ScreenName"></p>
+
+        <a id="GoogleMap" href="about:blank" target="_blank">Map</a>
+
+		<!-- The iframe where the FVTerm window will appear -->
+		<iframe id="FVTerm" style="position:absolute;left:0px;top:150px;width:80%;height:80%;" src="about:blank"></iframe>
+		
+		<script type="text/javascript">
+			// Global used to store current screen name
+			var screenName = '';
+			
+			// Global used to store postcode for map lookup
+			var postcode = null;
+
+			// The function called by the onnewscreen event
+			function onNewScreenCustom(rows, name) {
+			    screenName = name;
+			    var map = document.getElementById('GoogleMap');
+			    map.hidden = true;
+				document.getElementById('ScreenName').innerHTML = name;
+				switch (name) {
+				    case 'AcctSummary':
+				        postcode = fvt.GetScnText(10, 29, 8);
+				        map.href = "http://maps.google.co.uk/maps?q=" + postcode;
+				        map.hidden = false;
+				        break;
+				}
+			}
+			
+			// The function called by the onsend event
+			function onSendScreenCustom(aidKey) {
+				if (screenName == 'SysSelect') {
+					if (aidKey == '[Enter]') {
+						if (fvt.GetField(22, 15) != '2') {
+							window.alert('You can only use option 2.');
+							return false;
+						}
+					}
+				}
+				return true;
+			}
+		</script>
+	</body>	
+</html>	
