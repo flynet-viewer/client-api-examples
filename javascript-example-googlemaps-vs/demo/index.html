@@ -1,87 +1,206 @@
 <!DOCTYPE html>
 <html>
-	<head>
-		<title>Flynet Viewer FVTerm - JavaScript API Example</title>
-		<!-- The FLynet FVTerm JavaScript API -->
-		<script type="text/javascript" src="/FVTerm/scripts/FVTermParent.js"></script>
-	</head>
+<head style="display:none">
+	<!-- The FLynet FVTerm JavaScript API -->
+	<link rel="stylesheet" type="text/css" href="index.css">
+	<script type="text/javascript" src="/FVTerm/scripts/FVTermParent.js"></script>
+	<script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+
+</head>
 	<!-- When loading, call the function to connect the FVTerm session -->
-	<body lang="en" onload="javascript:startFVTerm();">
-		
-		<script type="text/javascript">
-		
-			// Global for Flynet Viewer Terminal API object
-			var fvt = null;
-			
-			// Create connection options for COnnectFVTerm factory function
-			var connectOptions = {};
-			connectOptions.autoStart = true;
-			connectOptions.hostName = 'Insure';
-			connectOptions.application = 'InsureRecog'
-			
-			function startFVTerm() {
-				// Connection factory function
-				// iframe ID, FVTerm URL, connection options, connected function
-				ConnectFVTerm('FVTerm', '/FVTerm/SCTerm.html', connectOptions, onConnected);
+<body lang="en" onload="javascript:startFVTerm();">
+
+	<script type="text/javascript">
+
+		// Global for Flynet Viewer Terminal API object
+		var fvt = null;
+
+		// Create connection options for COnnectFVTerm factory function
+		var connectOptions = {};
+		connectOptions.autoStart = true;
+		connectOptions.hostName = 'Insure';
+		connectOptions.application = 'InsureRecog'
+
+		function startFVTerm() {
+			// Connection factory function
+			// iframe ID, FVTerm URL, connection options, connected function
+			ConnectFVTerm('FVTerm', '/FVTerm/SCTerm.html', connectOptions, onConnected);
+		}
+
+		// Connected function
+		function onConnected() {
+			// Set the global Terminal API object to fvTermSession
+			fvt = fvTermSession;
+
+			// Wire up the onnewscreen event
+			fvt.onnewscreen = onNewScreenCustom;
+
+			// Wire up the onsend event
+			fvt.onsend = onSendScreenCustom;
+		}
+
+	</script>
+
+	<!-- The iframe where the FVTerm window will appear -->
+	<iframe id="FVTerm" style="position:absolute;left:0; top:0; width:99.6%;height:99.6%;" src="about:blank"></iframe>
+
+	<div id="mapModal" class="modal">
+		<div id="mapDiv" style="width:600px; height:450px; left:50%; top: 50%; transform: translate(-50%, -50%);"></div>
+	</div>
+
+	<script type="text/javascript">
+		//Global to store the API key; Google maps API setup. Please enter your API key here.
+        var APIKey = '';		
+
+        var URL = "https://maps.googleapis.com/maps/api/js?key=" + APIKey + "&callback";
+
+		if (APIKey != '') {
+			let script = document.createElement('script');
+			script.async = true;
+			script.defer = true;
+			script.src = URL;
+			document.body.appendChild(script);
+        }
+
+		// Global used to store current screen name
+		var screenName = '';
+
+		// Global used to store postcode for map lookup (now unused)
+		//var postcode = null;
+
+		var modal = document.getElementById("mapModal");
+
+		// When the user clicks anywhere outside of the modal, close it
+		window.onclick = function (event) {
+			if (event.target == modal) {
+				modal.style.display = "none";
 			}
-			
-			// Connected function
-			function onConnected() {
-				// Set the global Terminal API object to fvTermSession
-				fvt = fvTermSession;
-				
-				// Wire up the onnewscreen event
-				fvt.onnewscreen = onNewScreenCustom;
-				
-				// Wire up the onsend event
-				fvt.onsend = onSendScreenCustom;
-			}
+		}
 
-		</script>
-		
-		<h1>FVTerm JavaScript API Example</h1>
-		
-        <p id="ScreenName"></p>
+		// The function called by the onnewscreen event
+		function onNewScreenCustom(rows, name) {
+			//screenName = name;
 
-        <a id="GoogleMap" href="about:blank" target="_blank">Map</a>
-
-		<!-- The iframe where the FVTerm window will appear -->
-		<iframe id="FVTerm" style="position:absolute;left:0px;top:150px;width:80%;height:80%;" src="about:blank"></iframe>
-		
-		<script type="text/javascript">
-			// Global used to store current screen name
-			var screenName = '';
-			
-			// Global used to store postcode for map lookup
-			var postcode = null;
-
-			// The function called by the onnewscreen event
-			function onNewScreenCustom(rows, name) {
-			    screenName = name;
-			    var map = document.getElementById('GoogleMap');
-			    map.hidden = true;
-				document.getElementById('ScreenName').innerHTML = name;
-				switch (name) {
-				    case 'AcctSummary':
-				        postcode = fvt.GetScnText(10, 29, 8);
-				        map.href = "http://maps.google.co.uk/maps?q=" + postcode;
-				        map.hidden = false;
-				        break;
-				}
-			}
-			
-			// The function called by the onsend event
-			function onSendScreenCustom(aidKey) {
-				if (screenName == 'SysSelect') {
-					if (aidKey == '[Enter]') {
-						if (fvt.GetField(22, 15) != '2') {
-							window.alert('You can only use option 2.');
-							return false;
+			switch (name) {
+				case 'AcctSummary':
+					if (APIKey != '')
+						try {
+							attachMapsToPostcodeSpans();
 						}
+						catch (e) {
+							try {
+								attachMapsToPostcodeSpansNoApi();
+							}
+							catch (e) {
+							}
+						}
+					else
+						try {
+							attachMapsToPostcodeSpansNoApi();
+						}
+						catch (e) {
+                        }
+					break;
+				default:
+                    break;
+
+			}
+		}
+
+		function attachMapsToPostcodeSpans() {
+            var map = new google.maps.Map(document.getElementById('mapDiv'), {
+                zoom: 15,
+                center: { lat: -34.397, lng: 150.644 },
+                fullscreenControl: false
+			});
+
+			var geocoder = new google.maps.Geocoder();
+
+            var regex = new RegExp("^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$", 'gm');
+
+            $("#FVTerm").contents().find("html").contents().find("iframe#termW").contents().find("span.ST2").filter(function () {
+                return regex.test($(this).text().trim());
+            }).each(function () {
+                //if you want the span to be clickable instead of/as well as the image
+
+                //$(this).on('click', function () {
+                //	//ev.preventDefault();
+
+                //	geocodeAddress(geocoder, map, $(this).text().trim());
+
+                //	modal.style.display = "block";
+                //});
+                //$(this).hover(function () {
+                //	$(this).css('cursor', 'pointer');
+                //});
+
+                var thisText = $(this).text().trim();
+
+                $(this).text($(this).text().slice(0, -1));
+
+                var img = $('<img src="../demo/images/google_maps_icon.png" style="width:1.5%; height 1.5%; left:0; bottom:0;"/>')
+
+                img.on('click', function () {
+                    var result = geocodeAddress(geocoder, map, thisText);
+                });
+
+                img.hover(function () {
+                    $(this).css('cursor', 'pointer');
+                });
+
+                $(this).prepend(img);
+
+            });
+		}
+
+		function attachMapsToPostcodeSpansNoApi() {
+            var regex = new RegExp("^([Gg][Ii][Rr] 0[Aa]{2})|((([A-Za-z][0-9]{1,2})|(([A-Za-z][A-Ha-hJ-Yj-y][0-9]{1,2})|(([AZa-z][0-9][A-Za-z])|([A-Za-z][A-Ha-hJ-Yj-y][0-9]?[A-Za-z])))) [0-9][A-Za-z]{2})$", 'gm');
+
+            $("#FVTerm").contents().find("html").contents().find("iframe#termW").contents().find("span.ST2").filter(function () {
+                return regex.test($(this).text().trim());
+			}).each(function () {
+				var mapURL = "http://maps.google.co.uk/maps?q=" + $(this).text().trim();
+
+                var img = $('<a id="imagelink" href="' + mapURL +'" target="_blank"><img src="../demo/images/google_maps_icon.png" style="width:1.5%; height 1.5%; left:0; bottom:0;"/></a>')
+
+                img.hover(function () {
+                    $(this).css('cursor', 'pointer');
+                });
+
+                $(this).prepend(img);
+            });
+        }
+
+		function geocodeAddress(geocoder, resultsMap, postcode) {
+			var address = postcode;
+			geocoder.geocode({ 'address': address }, function (results, status) {
+				if (status === 'OK') {
+					resultsMap.setCenter(results[0].geometry.location);
+					var marker = new google.maps.Marker({
+						map: resultsMap,
+						position: results[0].geometry.location
+					});
+                    modal.style.display = "block";
+				} else {
+					alert('Geocode was not successful for the following reason: ' + status);
+				}
+			});
+		}
+
+		// The function called by the onsend event
+		function onSendScreenCustom(aidKey) {
+			if (screenName == 'SysSelect') {
+				if (aidKey == '[Enter]') {
+					if (fvt.GetField(22, 15) != '2') {
+						window.alert('You can only use option 2.');
+						return false;
 					}
 				}
-				return true;
 			}
-		</script>
-	</body>	
+			return true;
+		}
+
+	</script>
+
+</body>	
 </html>	
